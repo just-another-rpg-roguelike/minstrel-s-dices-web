@@ -1,11 +1,14 @@
 ---
 //Game Component
 import npcs from "../data/npcs.json";
+import { npcsToRichEvents, pickRandomAndIndex } from '../utils/get_next_events';
+
 const starter_npc = npcs.data[Math.floor(Math.random() * npcs.data.length)];
 const starter_event =
   starter_npc.events[Math.floor(Math.random() * starter_npc.events.length)];
 console.log(starter_npc);
 console.log(starter_event);
+console.log(npcsToRichEvents(npcs.data))
 
 const starter_dice_spades = Math.floor(Math.random() * 5) + 1;
 const starter_dice_clubs = 6 - starter_dice_spades;
