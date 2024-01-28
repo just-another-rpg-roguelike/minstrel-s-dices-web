@@ -1,30 +1,13 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Card from "../components/Card.astro";
-import Game from "../components/Game.astro";
+import GameComponet from "../components/Game.astro";
 ---
 
 <Layout title="Welcome to Minstrel's Dices.">
-  <main>
-    <div class="main-menu flex flex-col justify-center items-center space-y-12">
-      <img
-        class="logo w-52 h-52"
-        src="/images/jester-rabbit.png"
-        alt="Jester Rabbit"
-      />
-      <h1>
-        Welcome to <span class="text-gradient block">Minstrel's Dices</span>
-      </h1>
-
-      <ul role="list" class="link-card-grid">
-        <Card body="Start Adventure" isPlayButton={true} />
-        <Card body="Do Nothing" />
-        <Card body="Stare at the wall" />
-        <Card body="Go to sleep" />
-      </ul>
-    </div>
+  <main class="h-screen">
     <div class="game-container">
-      <Game />
+      <GameComponet />
     </div>
   </main>
   <div class="line-container pointer-events-none">
@@ -49,10 +32,6 @@ import Game from "../components/Game.astro";
       position: absolute;
       left: 0;
     }
-  }
-
-  .game-container {
-    display: none;
   }
 
   main {

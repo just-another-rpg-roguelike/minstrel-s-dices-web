@@ -1,0 +1,338 @@
+---
+//Game Component
+import npcs from "../data/npcs.json";
+const starter_npc = npcs.data[Math.floor(Math.random() * npcs.data.length)];
+const starter_event =
+  starter_npc.events[Math.floor(Math.random() * starter_npc.events.length)];
+console.log(starter_npc);
+console.log(starter_event);
+
+const starter_dice_spades = Math.floor(Math.random() * 5) + 1;
+const starter_dice_clubs = 6 - starter_dice_spades;
+const starter_dice = [
+  ...Array(starter_dice_spades).fill("spades"),
+  ...Array(starter_dice_clubs).fill("clubs"),
+];
+
+const spades_svg = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M9.02707 6.1501C9.02707 7.54321 7.82592 8.18137 6.99535 8.18182C6.06913 8.18182 5.36935 7.76231 4.95273 7.41976C5.00767 8.55306 5.27593 9.36272 6.47975 10H2.54732C3.75114 9.36272 4.0194 8.55306 4.07434 7.41976C3.65772 7.76208 2.95772 8.18226 2.03172 8.18182C1.20226 8.18182 0 7.54321 0 6.1501C0 3.60389 1.79371 4.29677 4.51342 0C7.23336 4.29677 9.02707 3.60411 9.02707 6.1501Z" fill="white"/>
+</svg>
+`;
+
+const clubs_svg = `<svg width="10" height="11" viewBox="0 0 10 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M10 5.95992C10.0001 6.51252 9.80619 7.04762 9.45206 7.47183C9.09792 7.89604 8.60606 8.18243 8.06233 8.28101C7.51859 8.37959 6.9575 8.2841 6.47698 8.01122C5.99646 7.73833 5.62702 7.30537 5.43313 6.7879C5.43133 8.33977 5.5309 9.37232 7.00352 10.1522H2.99413C4.46674 9.37254 4.56632 8.34022 4.56451 6.7879C4.40249 7.21936 4.11755 7.59387 3.74495 7.86511C3.37234 8.13635 2.92839 8.29242 2.46802 8.31403C2.00765 8.33564 1.55104 8.22183 1.15467 7.98668C0.758289 7.75154 0.43953 7.40536 0.237809 6.99097C0.0360883 6.57659 -0.0397461 6.11216 0.0196842 5.65513C0.0791145 5.1981 0.271203 4.76851 0.572194 4.41949C0.873185 4.07048 1.26988 3.81734 1.71321 3.69138C2.15654 3.56543 2.62707 3.57218 3.06661 3.71081C2.81921 3.35738 2.67351 2.94286 2.64534 2.51236C2.61718 2.08187 2.70764 1.6519 2.90687 1.26924C3.10611 0.886591 3.40649 0.565918 3.77532 0.342127C4.14415 0.118335 4.56729 0 4.99871 0C5.43012 0 5.85327 0.118335 6.2221 0.342127C6.59093 0.565918 6.89131 0.886591 7.09055 1.26924C7.28978 1.6519 7.38024 2.08187 7.35207 2.51236C7.32391 2.94286 7.1782 3.35738 6.93081 3.71081C7.28419 3.59937 7.65884 3.57271 8.02443 3.63301C8.39003 3.6933 8.73628 3.83885 9.03516 4.05787C9.33403 4.27689 9.57712 4.56321 9.74475 4.89366C9.91237 5.22411 9.99982 5.58939 10 5.95992Z" fill="#F8F8F8"/>
+</svg>
+`;
+---
+
+<section class="w-full pt-10 text-white">
+  <div
+    class="flex flex-col w-full h-full space-y-4 justify-center items-center"
+  >
+    <div
+      class="w-full text-center md:w-1/2 flex flex-col justify-center items-center"
+    >
+      <h4 class="text-sm font-bold mb-4 text-purple-500">{starter_npc.name}</h4>
+      <p
+        class="text-xs p-4 border-2 border-purple-100 rounded-lg mb-4"
+        id="typewriter"
+        data-text={starter_event.message}
+        class="mb-4"
+      >
+      </p>
+      <img
+        class="logo w-52 h-52 filter brightness-[90%] contrast-125"
+        src={starter_event.image_path}
+        alt="Jester Rabbit"
+      />
+    </div>
+    <div
+      class="w-full text-xs md:w-[80%] flex text-center justify-center items-stretch space-x-8"
+    >
+      <div
+        class="w-1/2 p-6 flex-grow flex justify-center items-center bg-red-700 hover:bg-red-800 border-2 border-purple-100 rounded-lg"
+      >
+        {starter_event.choices[0].description}
+      </div>
+      <div
+        class="w-1/2 p-6 flex-grow flex justify-center items-center bg-blue-700 hover:bg-blue-800 border-2 border-purple-100 rounded-lg"
+      >
+        {starter_event.choices[1].description}
+      </div>
+    </div>
+    <div class="py-8 flex flex-col justify-center items-center space-y-4">
+      <h4 class="text-sm font-bold mb-4 text-white">Dice probabilities</h4>
+      <div class="flex space-x-4">
+        {
+          starter_dice.map((dice) => (
+            <div
+              class={
+                "w-8 h-8 relative transform rotate-45 rounded-lg  border-2 border-purple-100 " +
+                (dice === "spades"
+                  ? "bg-red-700 hover:bg-red-800"
+                  : "bg-blue-700 hover:bg-blue-800")
+              }
+            >
+              <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-45">
+                <Fragment
+                  set:html={dice === "spades" ? spades_svg : clubs_svg}
+                />
+              </div>
+            </div>
+          ))
+        }
+        <div
+          class={"w-8 h-8 relative cursor-pointer transform rotate-45 rounded-lg  border-2 border-purple-100 hover:bg-gray-600"}
+        >
+          <div
+            class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-45"
+          >
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <g clip-path="url(#clip0_118_658)">
+                <path
+                  d="M10 0.833333V3.75C10 3.86285 9.95877 3.9605 9.8763 4.04297C9.79384 4.12543 9.69618 4.16667 9.58333 4.16667H6.66667C6.48437 4.16667 6.35634 4.07986 6.28255 3.90625C6.20877 3.73698 6.23915 3.58724 6.3737 3.45703L7.27214 2.55859C6.62977 1.96398 5.8724 1.66667 5 1.66667C4.54861 1.66667 4.11784 1.75456 3.70768 1.93034C3.29753 2.10612 2.94271 2.34375 2.64323 2.64323C2.34375 2.94271 2.10612 3.29753 1.93034 3.70768C1.75456 4.11784 1.66667 4.54861 1.66667 5C1.66667 5.45139 1.75456 5.88216 1.93034 6.29232C2.10612 6.70247 2.34375 7.05729 2.64323 7.35677C2.94271 7.65625 3.29753 7.89388 3.70768 8.06966C4.11784 8.24544 4.54861 8.33333 5 8.33333C5.51649 8.33333 6.00477 8.22049 6.46484 7.99479C6.92491 7.7691 7.31337 7.45009 7.63021 7.03776C7.66059 6.99436 7.7105 6.96832 7.77995 6.95964C7.84505 6.95964 7.89931 6.97917 7.94271 7.01823L8.83464 7.91667C8.8737 7.95139 8.89431 7.99588 8.89648 8.05013C8.89865 8.10438 8.88238 8.15321 8.84766 8.19661C8.37457 8.76953 7.80165 9.21332 7.12891 9.52799C6.45616 9.84266 5.74653 10 5 10C4.32292 10 3.67622 9.86762 3.0599 9.60286C2.44358 9.33811 1.91189 8.9822 1.46484 8.53516C1.0178 8.08811 0.661892 7.55642 0.397135 6.9401C0.132378 6.32378 0 5.67708 0 5C0 4.32292 0.132378 3.67622 0.397135 3.0599C0.661892 2.44358 1.0178 1.91189 1.46484 1.46484C1.91189 1.0178 2.44358 0.661892 3.0599 0.397135C3.67622 0.132378 4.32292 0 5 0C5.63802 0 6.25543 0.120443 6.85221 0.361328C7.449 0.602214 7.9796 0.94184 8.44401 1.38021L9.29036 0.540365C9.41623 0.405816 9.56814 0.375434 9.74609 0.449219C9.91536 0.523003 10 0.651042 10 0.833333Z"
+                  fill="white"></path>
+              </g>
+              <defs>
+                <clipPath id="clip0_118_658">
+                  <rect width="10" height="10" fill="white"></rect>
+                </clipPath>
+              </defs>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      class="dice-container flex w-full h-full justify-center items-center pt-4 pb-36"
+    >
+      <div class="dice-inner-container relative w-auto">
+        <h4
+          class="roll-label text-sm absolute whitespace-nowrap font-bold mb-4 text-white"
+        >
+          Roll the dice
+        </h4>
+        <div class="relative inline">
+          <div id="dice1" class="dice dice-one">
+            {
+              starter_dice.map((dice) => (
+                <div
+                  id="dice-one-side-one"
+                  class={
+                    "side one " +
+                    (dice === "spades" ? "bg-red-700" : "bg-blue-700")
+                  }
+                >
+                  <div class="dot one-1">{dice === "spades" ? "♠" : "♣"}</div>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style lang="scss">
+  .roll-label {
+    translate: -50% 100%;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    pointer-events: none;
+  }
+
+  .dice-inner-container {
+    &:hover {
+      .roll-label {
+        opacity: 1;
+      }
+    }
+
+    &.active {
+      .roll-label {
+        opacity: 0;
+      }
+    }
+  }
+
+  .dice {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    transform-style: preserve-3d;
+    transition: transform 1s;
+    &:not(.active) {
+      .side {
+        opacity: 0.7;
+      }
+    }
+  }
+
+  .dot {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    margin: -10px 5px 5px -10px;
+    color: #fff;
+    content: "♣";
+    font-size: 20px;
+    text-align: center;
+    line-height: 20px;
+    border-radius: 50%;
+  }
+
+  .dice-one {
+    position: absolute;
+    left: -30px;
+  }
+
+  .side {
+    position: absolute;
+    border-radius: 5px;
+    width: 60px;
+    height: 60px;
+    border: 2px solid #fff;
+    text-align: center;
+    line-height: 2em;
+  }
+
+  .side:nth-child(1) {
+    transform: translateZ(1.4em);
+  }
+
+  .side:nth-child(6) {
+    transform: rotateY(90deg) translateZ(1.4em);
+  }
+
+  .side:nth-child(3) {
+    transform: rotateY(-90deg) translateZ(1.4em);
+  }
+
+  .side:nth-child(4) {
+    transform: rotateX(90deg) translateZ(1.4em);
+  }
+
+  .side:nth-child(5) {
+    transform: rotateX(-90deg) translateZ(1.4em);
+  }
+
+  .side:nth-child(2) {
+    transform: rotateY(-180deg) translateZ(1.4em);
+  }
+
+  .show-1 {
+    transform: rotateX(720deg) rotateZ(-720deg);
+  }
+
+  .show-6 {
+    transform: rotateX(-900deg) rotateZ(1080deg);
+  }
+
+  .show-3 {
+    transform: rotateY(-450deg) rotateZ(-1440deg);
+  }
+
+  .show-4 {
+    transform: rotateY(810deg) rotateZ(720deg);
+  }
+
+  .show-5 {
+    transform: rotateX(-810deg) rotateZ(-1080deg);
+  }
+
+  .show-2 {
+    transform: rotateX(450deg) rotateZ(-720deg);
+  }
+
+  .two-1,
+  .three-1,
+  .four-1,
+  .five-1,
+  .six-1 {
+    top: 20%;
+    left: 20%;
+  }
+
+  .four-3,
+  .five-3,
+  .six-4 {
+    top: 20%;
+    left: 80%;
+  }
+
+  .one-1,
+  .three-2,
+  .five-5 {
+    top: 50%;
+    left: 50%;
+  }
+
+  .four-2,
+  .five-2,
+  .six-3 {
+    top: 80%;
+    left: 20%;
+  }
+
+  .two-2,
+  .three-3,
+  .four-4,
+  .five-4,
+  .six-6 {
+    top: 80%;
+    left: 80%;
+  }
+
+  .six-2 {
+    top: 50%;
+    left: 20%;
+  }
+
+  .six-5 {
+    top: 50%;
+    left: 80%;
+  }
+</style>
+
+<script>
+  import Typewriter from "typewriter-effect/dist/core";
+
+  new Typewriter("#typewriter", {
+    strings: (document.querySelector("#typewriter") as HTMLElement).dataset
+      .text,
+    autoStart: true,
+    loop: false,
+    delay: 50,
+  });
+
+  setTimeout(() => {}, 4000);
+
+  var elDiceOne = document.getElementById("dice1");
+
+  elDiceOne.onclick = function () {
+    rollDice();
+  };
+
+  function rollDice() {
+    var diceOne = Math.floor(Math.random() * 6 + 1);
+
+    for (var i = 1; i <= 6; i++) {
+      elDiceOne.classList.remove("show-" + i);
+      if (diceOne === i) {
+        elDiceOne.classList.add("show-" + i);
+      }
+    }
+
+    elDiceOne.classList.add("active");
+    document.querySelector(".dice-inner-container").classList.add("active");
+  }
+</script>
+<style lang="scss"></style>
