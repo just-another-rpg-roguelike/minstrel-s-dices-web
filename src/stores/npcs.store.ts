@@ -1,7 +1,7 @@
-import { map } from "nanostores";
-import npcs from "../data/npcs.json";
+import { atom } from "nanostores";
+import type { NPC } from "../types";
 
-// We need to store an array with  the index of the npc as a key and the number of events that that NPC has available (Not visited) 
-// 
+// Initialize the store with an empty array or your default value
+export const npcsStore = atom<NPC[]>([]);
 
-export const npcEventStore = map<
+// Add any additional store-related functions here

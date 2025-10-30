@@ -1,0 +1,666 @@
+---
+import npcs from "../data/npcs.json";
+
+interface Player {
+  name: string;
+  avatar: string;
+  deathFaces: number;
+  isEliminated: boolean;
+}
+
+interface GameState {
+  players: Player[];
+  currentRound: number;
+  expectedCard: string;
+  cardTypes: string[];
+}
+
+const defaultCardTypes = ["Kings", "Queens", "Aces"];
+
+// Serialize npcs data for client-side use and ensure it has the correct structure
+const serializedNpcs = JSON.stringify({
+  data: npcs.data.map((npc) => ({
+    name: npc.name,
+    image_path: npc.image_path || "/images/jester-rabbit.png", // fallback image
+  })),
+});
+
+const spades_svg = `<svg width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M9.02707 6.1501C9.02707 7.54321 7.82592 8.18137 6.99535 8.18182C6.06913 8.18182 5.36935 7.76231 4.95273 7.41976C5.00767 8.55306 5.27593 9.36272 6.47975 10H2.54732C3.75114 9.36272 4.0194 8.55306 4.07434 7.41976C3.65772 7.76208 2.95772 8.18226 2.03172 8.18182C1.20226 8.18182 0 7.54321 0 6.1501C0 3.60389 1.79371 4.29677 4.51342 0C7.23336 4.29677 9.02707 3.60411 9.02707 6.1501Z" fill="white"/>
+</svg>`;
+---
+
+<section class="w-full pt-10 text-white">
+  <div class="flex flex-col w-full max-w-4xl mx-auto h-full space-y-8 px-4">
+    <!-- Card Types Configuration -->
+    <div class="card-types-section flex flex-col items-center">
+      <h2 class="text-2xl font-bold mb-4">Card Types</h2>
+      <div class="flex space-x-4 mb-4">
+        <input
+          type="text"
+          id="cardTypeInput"
+          placeholder="Enter card type"
+          class="bg-purple-900 text-white px-4 py-2 rounded-lg border-2 border-purple-100"
+        />
+        <button
+          id="addCardType"
+          class="bg-purple-700 hover:bg-purple-800 px-6 py-2 rounded-lg border-2 border-purple-100"
+        >
+          Add Card Type
+        </button>
+      </div>
+      <div id="cardTypesList" class="flex flex-wrap gap-2 justify-center">
+        <!-- Card types will be added here dynamically -->
+      </div>
+    </div>
+
+    <!-- Player Registration -->
+    <div class="registration-section flex flex-col items-center">
+      <h2 class="text-2xl font-bold mb-4">Player Registration</h2>
+      <div class="flex space-x-4">
+        <input
+          type="text"
+          id="playerName"
+          placeholder="Enter player name"
+          class="bg-purple-900 text-white px-4 py-2 rounded-lg border-2 border-purple-100"
+        />
+        <button
+          id="addPlayer"
+          class="bg-purple-700 hover:bg-purple-800 px-6 py-2 rounded-lg border-2 border-purple-100"
+        >
+          Add Player
+        </button>
+      </div>
+    </div>
+
+    <!-- Player List -->
+    <div class="players-section flex flex-col items-center">
+      <h2 class="text-2xl font-bold mb-4">Players</h2>
+      <div id="playerList" class="grid grid-cols-2 md:grid-cols-3 gap-4 w-full">
+        <!-- Players will be added here dynamically -->
+      </div>
+    </div>
+
+    <!-- Game Controls -->
+    <div class="controls-section space-y-4 flex flex-col items-center">
+      <div class="flex space-x-4">
+        <button
+          id="startRound"
+          class="bg-green-700 hover:bg-green-800 px-6 py-2 rounded-lg border-2 border-purple-100"
+        >
+          Start New Round
+        </button>
+        <button
+          id="undoAction"
+          class="bg-red-700 hover:bg-red-800 px-6 py-2 rounded-lg border-2 border-purple-100"
+        >
+          Undo Last Action
+        </button>
+        <button
+          id="restartGame"
+          class="bg-purple-700 hover:bg-purple-800 px-6 py-2 rounded-lg border-2 border-purple-100"
+        >
+          Restart Game
+        </button>
+      </div>
+    </div>
+
+    <!-- Current Round Info -->
+    <div class="round-info hidden text-center">
+      <h3 class="text-xl font-bold mb-2">Current Round</h3>
+      <div id="expectedCard" class="text-2xl font-bold text-purple-300 mb-4">
+      </div>
+    </div>
+
+    <!-- Add Result Display -->
+    <div id="resultDisplay" class="text-center mb-4 h-16">
+      <p id="rollResult" class="text-xl font-bold text-purple-300 mb-2"></p>
+      <p id="winnerResult" class="text-2xl font-bold text-green-400"></p>
+    </div>
+
+    <!-- Add Dice Container -->
+    <div
+      class="dice-container flex w-full h-full justify-center items-center pt-4 pb-36"
+    >
+      <div class="dice-inner-container relative w-auto">
+        <h4
+          class="roll-label text-sm absolute whitespace-nowrap font-bold mb-4 text-white"
+        >
+          Roll the dice
+        </h4>
+        <div class="relative inline">
+          <div id="dice1" class="dice dice-one">
+            <div id="dice-one-side-one" class="side one bg-purple-700">
+              <div class="dot one-1">♠</div>
+            </div>
+            <div id="dice-one-side-two" class="side two bg-purple-700">
+              <div class="dot one-1">♠</div>
+            </div>
+            <div id="dice-one-side-three" class="side three bg-purple-700">
+              <div class="dot one-1">♠</div>
+            </div>
+            <div id="dice-one-side-four" class="side four bg-purple-700">
+              <div class="dot one-1">♠</div>
+            </div>
+            <div id="dice-one-side-five" class="side five bg-purple-700">
+              <div class="dot one-1">♠</div>
+            </div>
+            <div id="dice-one-side-six" class="side six bg-purple-700">
+              <div class="dot one-1">♠</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script define:vars={{ serializedNpcs, spades_svg }}>
+  // Modify gameState to use empty card types array initially
+  let gameState = {
+    players: [],
+    currentRound: 0,
+    expectedCard: "",
+    cardTypes: [], // Start empty instead of default values
+    history: [],
+  };
+
+  // Parse the npcs data
+  const npcsData = JSON.parse(serializedNpcs);
+
+  let usedAvatars = new Set();
+
+  const getRandomAvatar = () => {
+    try {
+      if (!npcsData.data || !npcsData.data.length) {
+        console.error("No NPC data available");
+        return "/images/jester-rabbit.png"; // fallback image
+      }
+
+      // Filter out already used avatars
+      const availableNpcs = npcsData.data.filter(
+        (npc) => !usedAvatars.has(npc.image_path || "/images/jester-rabbit.png")
+      );
+
+      // If no unique avatars left, return fallback
+      if (availableNpcs.length === 0) {
+        console.warn("No unique avatars left");
+        return "/images/jester-rabbit.png";
+      }
+
+      // Pick random avatar from remaining ones
+      const randomNpc =
+        availableNpcs[Math.floor(Math.random() * availableNpcs.length)];
+      const avatarPath = randomNpc.image_path || "/images/jester-rabbit.png";
+
+      // Add to used set
+      usedAvatars.add(avatarPath);
+
+      return avatarPath;
+    } catch (error) {
+      console.error("Error getting random avatar:", error);
+      return "/images/jester-rabbit.png";
+    }
+  };
+
+  // DOM Elements
+  const playerNameInput = document.getElementById("playerName");
+  const addPlayerBtn = document.getElementById("addPlayer");
+  const playerList = document.getElementById("playerList");
+  const startRoundBtn = document.getElementById("startRound");
+  const undoActionBtn = document.getElementById("undoAction");
+  const roundInfo = document.querySelector(".round-info");
+  const expectedCardDisplay = document.getElementById("expectedCard");
+  const restartGameBtn = document.getElementById("restartGame");
+
+  // Add DOM elements for card types
+  const cardTypeInput = document.getElementById("cardTypeInput");
+  const addCardTypeBtn = document.getElementById("addCardType");
+  const cardTypesList = document.getElementById("cardTypesList");
+
+  // Function to update card types display
+  function updateCardTypesList() {
+    if (!cardTypesList) return;
+
+    cardTypesList.innerHTML = gameState.cardTypes
+      .map(
+        (type, index) => `
+        <div class="card-type-item bg-purple-900 px-3 py-1 rounded-lg border-2 border-purple-100 flex items-center space-x-2">
+          <span>${type}</span>
+          <button 
+            class="remove-card-type text-gray-400 hover:text-red-500 ml-2"
+            data-index="${index}"
+          >
+            ×
+          </button>
+        </div>
+      `
+      )
+      .join("");
+
+    // Add click handlers for remove buttons
+    document.querySelectorAll(".remove-card-type").forEach((button) => {
+      button.addEventListener("click", () => {
+        const index = parseInt(button.dataset.index);
+        gameState.cardTypes.splice(index, 1);
+        updateCardTypesList();
+      });
+    });
+  }
+
+  // Add card type handler
+  addCardTypeBtn?.addEventListener("click", () => {
+    const cardType = cardTypeInput?.value.trim();
+    if (cardType && !gameState.cardTypes.includes(cardType)) {
+      gameState.cardTypes.push(cardType);
+      updateCardTypesList();
+      if (cardTypeInput) cardTypeInput.value = "";
+    }
+  });
+
+  // Add enter key support for card type input
+  cardTypeInput?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      addCardTypeBtn?.click();
+    }
+  });
+
+  // Add Player
+  addPlayerBtn?.addEventListener("click", () => {
+    const name = playerNameInput?.value.trim();
+    if (name) {
+      const newPlayer = {
+        name,
+        avatar: getRandomAvatar(),
+        deathFaces: 1,
+        isEliminated: false,
+      };
+      gameState.players.push(newPlayer);
+      updatePlayerList();
+      playerNameInput.value = "";
+    }
+  });
+
+  // Also add enter key support for player name input
+  playerNameInput?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      addPlayerBtn?.click();
+    }
+  });
+
+  // Add selected player tracking
+  let selectedPlayerId = null;
+
+  // Modify updatePlayerList function
+  function updatePlayerList() {
+    if (!playerList) return;
+
+    playerList.innerHTML = gameState.players
+      .map(
+        (player, index) => `
+        <div 
+          class="player-card p-4 ${player.isEliminated ? "opacity-50" : ""} 
+                ${selectedPlayerId === index ? "bg-red-900" : "bg-purple-900"} 
+                rounded-lg border-2 border-purple-100 cursor-pointer relative"
+          data-player-id="${index}"
+        >
+          <!-- Add remove button -->
+          <button 
+            class="remove-player absolute top-2 right-2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 text-xl font-bold transition-colors"
+            data-player-id="${index}"
+          >
+            ×
+          </button>
+          
+          <img 
+            src="${player.avatar}" 
+            alt="${player.name}" 
+            class="w-32 h-32 mx-auto mb-2 rounded-full"
+          >
+          <h3 class="text-center font-bold">${player.name}</h3>
+          
+          <!-- Dice Faces Display -->
+          <div class="flex justify-center space-x-2 my-3">
+            ${Array(6)
+              .fill(null)
+              .map((_, i) => {
+                const isDeath = i < player.deathFaces;
+                return `
+                <div class="w-6 h-6 relative transform rotate-45 rounded-lg border-2 border-purple-100 
+                  ${isDeath ? "bg-red-700" : "bg-blue-700"}">
+                  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 -rotate-45">
+                    ${spades_svg}
+                  </div>
+                </div>`;
+              })
+              .join("")}
+          </div>
+          
+          ${
+            !player.isEliminated
+              ? `<p class="text-center text-gray-400 mt-2">Click to select</p>`
+              : `<p class="text-center text-red-500 mt-2">Eliminated</p>`
+          }
+        </div>
+      `
+      )
+      .join("");
+
+    // Add click handlers to player cards
+    document.querySelectorAll(".player-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const playerId = parseInt(card.dataset.playerId);
+        const player = gameState.players[playerId];
+
+        if (player.isEliminated) return;
+
+        // Toggle selection
+        if (selectedPlayerId === playerId) {
+          selectedPlayerId = null;
+        } else {
+          selectedPlayerId = playerId;
+        }
+
+        // Update dice faces
+        updateDiceFaces();
+
+        // Update player cards to show selection
+        updatePlayerList();
+      });
+    });
+
+    // Add click handlers for remove buttons
+    document.querySelectorAll(".remove-player").forEach((button) => {
+      button.addEventListener("click", (e) => {
+        e.stopPropagation(); // Prevent triggering the player card click
+        const playerId = parseInt(button.dataset.playerId);
+
+        // Remove the avatar from used set
+        const removedPlayer = gameState.players[playerId];
+        usedAvatars.delete(removedPlayer.avatar);
+
+        // Save state for undo
+        gameState.history.push(JSON.parse(JSON.stringify(gameState.players)));
+
+        // Remove the player
+        gameState.players.splice(playerId, 1);
+
+        // Reset selected player if the removed player was selected
+        if (selectedPlayerId === playerId) {
+          selectedPlayerId = null;
+        } else if (selectedPlayerId > playerId) {
+          // Adjust selectedPlayerId if it was after the removed player
+          selectedPlayerId--;
+        }
+
+        updateDiceFaces();
+        updatePlayerList();
+      });
+    });
+  }
+
+  // Add function to update dice faces based on selected player
+  function updateDiceFaces() {
+    const player =
+      selectedPlayerId !== null ? gameState.players[selectedPlayerId] : null;
+
+    if (!player) {
+      // Reset dice faces when no player selected
+      document.querySelectorAll("#dice1 .side").forEach((side) => {
+        side.querySelector(".dot").textContent = "♠";
+        side.classList.remove("bg-red-700", "bg-blue-700");
+        side.classList.add("bg-purple-700");
+      });
+      return;
+    }
+
+    // Update dice faces based on player's death faces
+    document.querySelectorAll("#dice1 .side").forEach((side, index) => {
+      const isDeath = index < player.deathFaces;
+      side.classList.remove("bg-purple-700", "bg-red-700", "bg-blue-700");
+      side.classList.add(isDeath ? "bg-red-700" : "bg-blue-700");
+    });
+  }
+
+  // Add new DOM elements
+  const rollResultDisplay = document.getElementById("rollResult");
+  const winnerResultDisplay = document.getElementById("winnerResult");
+
+  function clearResults() {
+    if (rollResultDisplay) rollResultDisplay.textContent = "";
+    if (winnerResultDisplay) winnerResultDisplay.textContent = "";
+  }
+
+  // Modify startRoundBtn click handler to check for card types
+  startRoundBtn?.addEventListener("click", () => {
+    if (gameState.cardTypes.length === 0) {
+      alert("Please add at least one card type before starting the round");
+      return;
+    }
+
+    clearResults();
+    gameState.currentRound++;
+    gameState.expectedCard =
+      gameState.cardTypes[
+        Math.floor(Math.random() * gameState.cardTypes.length)
+      ];
+    if (roundInfo) roundInfo.classList.remove("hidden");
+    if (expectedCardDisplay)
+      expectedCardDisplay.textContent = `${gameState.expectedCard} Table`;
+
+    updatePlayerList();
+  });
+
+  // Modify restartGame function to preserve card types
+  function restartGame() {
+    clearResults();
+    selectedPlayerId = null;
+    gameState.currentRound = 0;
+    gameState.history = [];
+    usedAvatars.clear();
+
+    gameState.players = gameState.players.map((player) => ({
+      ...player,
+      deathFaces: 1,
+      isEliminated: false,
+    }));
+
+    if (roundInfo) roundInfo.classList.add("hidden");
+    if (expectedCardDisplay) expectedCardDisplay.textContent = "";
+
+    updateDiceFaces();
+    updatePlayerList();
+  }
+
+  restartGameBtn?.addEventListener("click", restartGame);
+
+  // Modify rollDice function to unselect player after roll
+  function rollDice() {
+    if (!elDiceOne || selectedPlayerId === null) return;
+
+    const player = gameState.players[selectedPlayerId];
+    if (!player || player.isEliminated) return;
+
+    clearResults();
+
+    // Save state for undo
+    gameState.history.push(JSON.parse(JSON.stringify(gameState.players)));
+
+    const diceOne = Math.floor(Math.random() * 6 + 1);
+
+    for (let i = 1; i <= 6; i++) {
+      elDiceOne.classList.remove("show-" + i);
+      if (diceOne === i) {
+        elDiceOne.classList.add("show-" + i);
+      }
+    }
+
+    elDiceOne.classList.add("active");
+    document.querySelector(".dice-inner-container")?.classList.add("active");
+
+    // Process roll result
+    const rollResult = diceOne <= player.deathFaces;
+
+    setTimeout(() => {
+      if (rollResultDisplay) {
+        rollResultDisplay.textContent = `${player.name} rolled a ${diceOne}${
+          rollResult ? " - Death!" : " - Safe!"
+        }`;
+      }
+
+      if (rollResult) {
+        player.isEliminated = true;
+        // Check for winner
+        const activePlayers = gameState.players.filter((p) => !p.isEliminated);
+        if (activePlayers.length === 1 && winnerResultDisplay) {
+          winnerResultDisplay.textContent = `🎉 ${activePlayers[0].name} wins the game! 🎉`;
+        }
+      } else {
+        player.deathFaces++;
+      }
+
+      // Unselect player after roll
+      selectedPlayerId = null;
+
+      updateDiceFaces();
+      updatePlayerList();
+    }, 1000);
+  }
+
+  // Clear results when undoing
+  undoActionBtn?.addEventListener("click", () => {
+    clearResults();
+    const previousState = gameState.history.pop();
+    if (previousState) {
+      gameState.players = previousState;
+      updatePlayerList();
+    }
+  });
+
+  // Add dice rolling functionality
+  const elDiceOne = document.getElementById("dice1");
+
+  elDiceOne?.addEventListener("click", function () {
+    rollDice();
+  });
+
+  // Initialize card types list
+  updateCardTypesList();
+</script>
+
+<style>
+  .player-card {
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .player-card:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+  }
+
+  .roll-label {
+    translate: -50% 100%;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    pointer-events: none;
+  }
+
+  .dice-inner-container {
+    &:hover {
+      .roll-label {
+        opacity: 1;
+      }
+    }
+
+    &.active {
+      .roll-label {
+        opacity: 0;
+      }
+    }
+  }
+
+  .dice {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    transform-style: preserve-3d;
+    transition: transform 1s;
+    &:not(.active) {
+      .side {
+        opacity: 0.7;
+      }
+    }
+  }
+
+  .dot {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    margin: -10px 5px 5px -10px;
+    color: #fff;
+    font-size: 20px;
+    text-align: center;
+    line-height: 20px;
+    border-radius: 50%;
+  }
+
+  .dice-one {
+    position: absolute;
+    left: -30px;
+  }
+
+  .side {
+    position: absolute;
+    border-radius: 5px;
+    width: 60px;
+    height: 60px;
+    border: 2px solid #fff;
+    text-align: center;
+    line-height: 2em;
+  }
+
+  .side:nth-child(1) {
+    transform: translateZ(1.4em);
+  }
+  .side:nth-child(6) {
+    transform: rotateY(90deg) translateZ(1.4em);
+  }
+  .side:nth-child(3) {
+    transform: rotateY(-90deg) translateZ(1.4em);
+  }
+  .side:nth-child(4) {
+    transform: rotateX(90deg) translateZ(1.4em);
+  }
+  .side:nth-child(5) {
+    transform: rotateX(-90deg) translateZ(1.4em);
+  }
+  .side:nth-child(2) {
+    transform: rotateY(-180deg) translateZ(1.4em);
+  }
+
+  .show-1 {
+    transform: rotateX(720deg) rotateZ(-720deg);
+  }
+  .show-6 {
+    transform: rotateX(-900deg) rotateZ(1080deg);
+  }
+  .show-3 {
+    transform: rotateY(-450deg) rotateZ(-1440deg);
+  }
+  .show-4 {
+    transform: rotateY(810deg) rotateZ(720deg);
+  }
+  .show-5 {
+    transform: rotateX(-810deg) rotateZ(-1080deg);
+  }
+  .show-2 {
+    transform: rotateX(450deg) rotateZ(-720deg);
+  }
+
+  .one-1 {
+    top: 50%;
+    left: 50%;
+  }
+</style>
