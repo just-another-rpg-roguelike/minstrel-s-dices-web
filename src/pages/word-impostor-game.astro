@@ -1,0 +1,48 @@
+---
+import Layout from "../layouts/Layout.astro";
+import WordImpostorGameComponent from "../components/WordImpostorGame.astro";
+---
+
+<Layout title="Word Impostor Game - Minstrel's Dices">
+  <main class="h-screen">
+    <div class="game-container">
+      <WordImpostorGameComponent />
+    </div>
+  </main>
+  <div class="line-container pointer-events-none">
+    <div class="line top-[0]"></div>
+    <div class="line top-[20%]"></div>
+    <div class="line top-[40%]"></div>
+    <div class="line top-[60%]"></div>
+    <div class="line top-[80%]"></div>
+  </div>
+</Layout>
+
+<style lang="scss">
+  :global(.line-container) {
+    top: 0;
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    .line {
+      background-color: #9a47a1;
+      width: 0;
+      height: 20%;
+      position: absolute;
+      left: 0;
+    }
+  }
+
+  main {
+    color: white;
+    font-size: 20px;
+    line-height: 1.6;
+    padding: 2rem;
+  }
+  .game-container {
+    margin: auto;
+    width: 800px;
+    max-width: calc(100% - 2rem);
+    min-height: 100vh;
+  }
+</style>

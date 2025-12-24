@@ -5,15 +5,16 @@ interface Props {
   href?: string;
   isPlayButton?: boolean;
   isCardGameButton?: boolean;
+  isWordImpostorButton?: boolean;
 }
 
-const { href, title, body, isPlayButton, isCardGameButton } = Astro.props;
+const { href, title, body, isPlayButton, isCardGameButton, isWordImpostorButton } = Astro.props;
 ---
 
 <li class="link-card">
   <a
     href={href}
-    class={`${isPlayButton || isCardGameButton ? "play-button" : ""}`}
+    class={`${isPlayButton || isCardGameButton || isWordImpostorButton ? "play-button" : ""}`}
   >
     <h2>
       {title}
@@ -81,6 +82,9 @@ const { href, title, body, isPlayButton, isCardGameButton } = Astro.props;
         const isCardGame = button
           .closest("a")
           .textContent.includes("Card Game");
+        const isWordImpostor = button
+          .closest("a")
+          .textContent.includes("Word Impostor");
 
         const mainMenu = document.querySelector(".main-menu") as HTMLElement;
         const gameContainer = document.querySelector(
@@ -94,6 +98,10 @@ const { href, title, body, isPlayButton, isCardGameButton } = Astro.props;
           // If it's the card game, navigate to the card game route
           if (isCardGame) {
             window.location.href = "/card-game";
+          }
+          // If it's the word impostor game, navigate to that route
+          else if (isWordImpostor) {
+            window.location.href = "/word-impostor-game";
           }
         }
       });

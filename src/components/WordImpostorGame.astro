@@ -1,0 +1,820 @@
+---
+import npcs from "../data/npcs.json";
+
+interface Player {
+  name: string;
+  avatar: string;
+  role: string;
+  hasSeenRole: boolean;
+}
+
+interface GameState {
+  players: Player[];
+  theme: string;
+  word: string;
+  gamePhase: "setup" | "theme" | "roleReveal" | "ready";
+  currentRevealIndex: number;
+  loading: boolean;
+}
+
+// Serialize npcs data for client-side use
+const serializedNpcs = JSON.stringify({
+  data: npcs.data.map((npc) => ({
+    name: npc.name,
+    image_path: npc.image_path || "/images/jester-rabbit.png",
+  })),
+});
+---
+
+<section class="w-full pt-10 text-white">
+  <div class="flex flex-col w-full max-w-4xl mx-auto h-full space-y-8 px-4">
+    <!-- Phase 1: Player Registration -->
+    <div
+      id="setupPhase"
+      class="registration-section flex flex-col items-center"
+    >
+      <h2 class="text-2xl font-bold mb-4">Word Impostor Game Setup</h2>
+      <div class="flex space-x-4 mb-6">
+        <input
+          type="text"
+          id="playerName"
+          placeholder="Enter player name"
+          class="bg-purple-900 text-white px-4 py-2 rounded-lg border-2 border-purple-100"
+        />
+        <button
+          id="addPlayer"
+          class="bg-purple-700 hover:bg-purple-800 px-6 py-2 rounded-lg border-2 border-purple-100"
+        >
+          Add Player
+        </button>
+      </div>
+      <div id="playerList" class="grid grid-cols-2 md:grid-cols-3 gap-4 w-full">
+        <!-- Players will be added here dynamically -->
+      </div>
+    </div>
+
+    <!-- Phase 2: Theme Input -->
+    <div id="themePhase" class="theme-section hidden flex-col items-center">
+      <h2 class="text-2xl font-bold mb-4">Select Game Theme</h2>
+      <p class="text-lg text-purple-300 mb-4">All players are ready!</p>
+      <div class="flex space-x-4 mb-6">
+        <input
+          type="text"
+          id="themeInput"
+          placeholder="Enter theme (e.g., Animals, Fruits, Professions)"
+          class="bg-purple-900 text-white px-4 py-2 rounded-lg border-2 border-purple-100"
+        />
+        <button
+          id="generateWord"
+          class="bg-green-700 hover:bg-green-800 px-6 py-2 rounded-lg border-2 border-purple-100"
+        >
+          Generate Word
+        </button>
+      </div>
+      <div id="loadingIndicator" class="hidden">
+        <p class="text-purple-300">Generating word from theme...</p>
+      </div>
+
+      <!-- Previous Themes Section -->
+      <div id="previousThemesSection" class="w-full mt-8">
+        <h3 class="text-lg font-bold text-purple-300 mb-3">Previous Themes</h3>
+        <div
+          id="previousThemesList"
+          class="flex flex-wrap gap-2 justify-center"
+        >
+          <!-- Previous themes will be added here dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 3: Role Reveal -->
+    <div
+      id="roleRevealPhase"
+      class="role-reveal-section hidden flex-col items-center"
+    >
+      <h2 class="text-2xl font-bold mb-4">Role Reveal</h2>
+      <p class="text-lg text-purple-300 mb-2">
+        Theme: <span id="themeDisplay" class="font-bold text-purple-100"></span>
+      </p>
+
+      <div
+        id="roleRevealContainer"
+        class="bg-purple-900 rounded-lg border-2 border-purple-100 p-8 mb-6 text-center w-full max-w-md"
+      >
+        <div class="mb-6">
+          <img
+            id="playerAvatarDisplay"
+            src=""
+            alt="Player Avatar"
+            class="w-32 h-32 mx-auto rounded-full border-4 border-purple-300"
+          />
+        </div>
+        <p id="currentPlayerName" class="text-xl font-bold mb-4"></p>
+        <div
+          id="roleDisplay"
+          class="text-4xl font-bold text-purple-300 mb-4 min-h-16 flex items-center justify-center"
+        >
+          <!-- Role will be displayed here -->
+        </div>
+        <p class="text-sm text-gray-400">
+          Your role has been revealed to you only
+        </p>
+      </div>
+
+      <button
+        id="confirmRoleButton"
+        class="bg-blue-700 hover:bg-blue-800 px-8 py-3 rounded-lg border-2 border-purple-100 mb-6"
+      >
+        I've Seen My Role
+      </button>
+
+      <div id="revealProgress" class="text-center">
+        <p id="progressText" class="text-purple-300"></p>
+      </div>
+    </div>
+
+    <!-- Phase 3.5: Handoff Screen -->
+    <div
+      id="handoffPhase"
+      class="handoff-section hidden flex-col items-center justify-center"
+    >
+      <div
+        class="bg-purple-900 rounded-lg border-2 border-purple-100 p-12 text-center w-full max-w-2xl"
+      >
+        <h2 class="text-3xl font-bold mb-8 text-purple-300">
+          📱 Pass the Device
+        </h2>
+        <p class="text-2xl font-bold mb-4">
+          Next player: <span id="nextPlayerNameDisplay" class="text-purple-100"
+          ></span>
+        </p>
+        <p class="text-lg text-purple-300 mb-12">
+          Make sure the current player cannot see the screen
+        </p>
+
+        <button
+          id="nextPlayerButton"
+          class="bg-green-700 hover:bg-green-800 px-8 py-4 rounded-lg border-2 border-purple-100 text-lg font-bold"
+        >
+          Next Player Ready - Continue
+        </button>
+      </div>
+    </div>
+
+    <!-- Phase 4: Ready -->
+    <div id="readyPhase" class="ready-section hidden flex-col items-center">
+      <h2 class="text-2xl font-bold mb-6">All Roles Revealed!</h2>
+      <p class="text-lg text-purple-300 mb-8">
+        Everyone has seen their role. Ready to start the game?
+      </p>
+
+      <div class="mb-6 text-center">
+        <p class="text-purple-300 mb-2">
+          Theme: <span id="finalThemeDisplay" class="font-bold text-purple-100"
+          ></span>
+        </p>
+        <p class="text-sm text-gray-400">
+          (The secret word is known only to the players)
+        </p>
+      </div>
+
+      <div class="flex space-x-4">
+        <button
+          id="startGameButton"
+          class="bg-green-700 hover:bg-green-800 px-8 py-3 rounded-lg border-2 border-purple-100"
+        >
+          Start Game
+        </button>
+        <button
+          id="restartGameButton"
+          class="bg-red-700 hover:bg-red-800 px-8 py-3 rounded-lg border-2 border-purple-100"
+        >
+          Restart Setup
+        </button>
+      </div>
+    </div>
+
+    <!-- Game In Progress -->
+    <div
+      id="gameInProgressPhase"
+      class="game-progress-section hidden flex-col items-center"
+    >
+      <h2 class="text-2xl font-bold mb-4">Game In Progress</h2>
+      <p class="text-lg text-purple-300 mb-6">
+        Theme: <span id="gameThemeDisplay" class="font-bold text-purple-100"
+        ></span>
+      </p>
+
+      <div
+        class="bg-purple-900 rounded-lg border-2 border-purple-100 p-6 mb-6 w-full"
+      >
+        <h3 class="text-xl font-bold mb-4">Players and Their Roles:</h3>
+        <div id="playerRolesList" class="space-y-3">
+          <!-- Players and roles will be shown here -->
+        </div>
+      </div>
+
+      <button
+        id="newGameButton"
+        class="bg-purple-700 hover:bg-purple-800 px-8 py-3 rounded-lg border-2 border-purple-100"
+      >
+        New Game
+      </button>
+    </div>
+
+    <!-- Start Button (visible in setup phase) -->
+    <div
+      id="setupControls"
+      class="controls-section space-y-4 flex flex-col items-center mt-8"
+    >
+      <button
+        id="startGameSetup"
+        class="bg-green-700 hover:bg-green-800 px-8 py-3 rounded-lg border-2 border-purple-100 disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled
+      >
+        Start Game (Min 2 Players)
+      </button>
+    </div>
+  </div>
+</section>
+
+<script define:vars={{ serializedNpcs }}>
+  let gameState = {
+    players: [],
+    theme: "",
+    word: "",
+    gamePhase: "setup",
+    currentRevealIndex: 0,
+    loading: false,
+  };
+
+  const npcsData = JSON.parse(serializedNpcs);
+  let usedAvatars = new Set();
+
+  // LocalStorage keys
+  const PLAYERS_STORAGE_KEY = "wordImpostorGame_players";
+  const AVATARS_STORAGE_KEY = "wordImpostorGame_usedAvatars";
+  const WORD_HISTORY_STORAGE_KEY = "wordImpostorGame_wordHistory";
+
+  // Load players from localStorage on initialization
+  const loadPlayersFromStorage = () => {
+    try {
+      const storedPlayers = localStorage.getItem(PLAYERS_STORAGE_KEY);
+      const storedAvatars = localStorage.getItem(AVATARS_STORAGE_KEY);
+      const storedWordHistory = localStorage.getItem(WORD_HISTORY_STORAGE_KEY);
+
+      if (storedPlayers) {
+        gameState.players = JSON.parse(storedPlayers);
+      }
+
+      if (storedAvatars) {
+        usedAvatars = new Set(JSON.parse(storedAvatars));
+      }
+
+      if (storedWordHistory) {
+        gameState.word = JSON.parse(storedWordHistory).word;
+      }
+    } catch (error) {
+      console.error("Error loading from localStorage:", error);
+    }
+  };
+
+  // Save players to localStorage
+  const savePlayersToStorage = () => {
+    try {
+      localStorage.setItem(
+        PLAYERS_STORAGE_KEY,
+        JSON.stringify(gameState.players)
+      );
+      localStorage.setItem(
+        AVATARS_STORAGE_KEY,
+        JSON.stringify(Array.from(usedAvatars))
+      );
+      localStorage.setItem(
+        WORD_HISTORY_STORAGE_KEY,
+        JSON.stringify({
+          theme: gameState.theme,
+          word: gameState.word,
+        })
+      );
+    } catch (error) {
+      console.error("Error saving to localStorage:", error);
+    }
+  };
+
+  // Get word history for a specific theme
+  const getThemeHistory = (theme) => {
+    try {
+      const allHistory = localStorage.getItem("wordImpostorGame_themeHistory");
+      if (!allHistory) return [];
+
+      const history = JSON.parse(allHistory);
+      const themeHistory = history.filter(
+        (entry) => entry.theme.toLowerCase() === theme.toLowerCase()
+      );
+      return themeHistory.map((entry) => entry.word);
+    } catch (error) {
+      console.error("Error getting theme history:", error);
+      return [];
+    }
+  };
+
+  // Add theme to history
+  const addToThemeHistory = (theme, word) => {
+    try {
+      let allHistory = [];
+      const existingHistory = localStorage.getItem(
+        "wordImpostorGame_themeHistory"
+      );
+      if (existingHistory) {
+        allHistory = JSON.parse(existingHistory);
+      }
+
+      allHistory.push({ theme, word, timestamp: Date.now() });
+
+      // Keep only last 50 entries
+      if (allHistory.length > 50) {
+        allHistory = allHistory.slice(-50);
+      }
+
+      localStorage.setItem(
+        "wordImpostorGame_themeHistory",
+        JSON.stringify(allHistory)
+      );
+    } catch (error) {
+      console.error("Error adding to theme history:", error);
+    }
+  };
+
+  // Get unique recent themes (excluding current)
+  const getRecentThemes = () => {
+    try {
+      const allHistory = localStorage.getItem("wordImpostorGame_themeHistory");
+      if (!allHistory) return [];
+
+      const history = JSON.parse(allHistory);
+      const uniqueThemes = [];
+      const seenThemes = new Set();
+
+      // Iterate from most recent backwards
+      for (let i = history.length - 1; i >= 0; i--) {
+        const theme = history[i].theme;
+        if (!seenThemes.has(theme.toLowerCase())) {
+          seenThemes.add(theme.toLowerCase());
+          uniqueThemes.push(theme);
+          if (uniqueThemes.length >= 5) break; // Show last 5 unique themes
+        }
+      }
+
+      return uniqueThemes;
+    } catch (error) {
+      console.error("Error getting recent themes:", error);
+      return [];
+    }
+  };
+
+  const getRandomAvatar = () => {
+    try {
+      if (!npcsData.data || !npcsData.data.length) {
+        return "/images/jester-rabbit.png";
+      }
+
+      const availableNpcs = npcsData.data.filter(
+        (npc) => !usedAvatars.has(npc.image_path || "/images/jester-rabbit.png")
+      );
+
+      if (availableNpcs.length === 0) {
+        return "/images/jester-rabbit.png";
+      }
+
+      const randomNpc =
+        availableNpcs[Math.floor(Math.random() * availableNpcs.length)];
+      const avatarPath = randomNpc.image_path || "/images/jester-rabbit.png";
+
+      usedAvatars.add(avatarPath);
+
+      return avatarPath;
+    } catch (error) {
+      console.error("Error getting random avatar:", error);
+      return "/images/jester-rabbit.png";
+    }
+  };
+
+  // DOM Elements
+  const playerNameInput = document.getElementById("playerName");
+  const addPlayerBtn = document.getElementById("addPlayer");
+  const playerList = document.getElementById("playerList");
+  const startGameSetupBtn = document.getElementById("startGameSetup");
+  const setupPhase = document.getElementById("setupPhase");
+  const themePhase = document.getElementById("themePhase");
+  const roleRevealPhase = document.getElementById("roleRevealPhase");
+  const readyPhase = document.getElementById("readyPhase");
+  const gameInProgressPhase = document.getElementById("gameInProgressPhase");
+  const setupControls = document.getElementById("setupControls");
+  const handoffPhase = document.getElementById("handoffPhase");
+  const nextPlayerButton = document.getElementById("nextPlayerButton");
+  const nextPlayerNameDisplay = document.getElementById(
+    "nextPlayerNameDisplay"
+  );
+
+  // Theme phase elements
+  const themeInput = document.getElementById("themeInput");
+  const generateWordBtn = document.getElementById("generateWord");
+  const loadingIndicator = document.getElementById("loadingIndicator");
+  const themeDisplay = document.getElementById("themeDisplay");
+  const previousThemesList = document.getElementById("previousThemesList");
+  const previousThemesSection = document.getElementById(
+    "previousThemesSection"
+  );
+
+  // Role reveal elements
+  const roleRevealContainer = document.getElementById("roleRevealContainer");
+  const currentPlayerName = document.getElementById("currentPlayerName");
+  const roleDisplay = document.getElementById("roleDisplay");
+  const confirmRoleButton = document.getElementById("confirmRoleButton");
+  const progressText = document.getElementById("progressText");
+  const playerAvatarDisplay = document.getElementById("playerAvatarDisplay");
+
+  // Ready phase elements
+  const finalThemeDisplay = document.getElementById("finalThemeDisplay");
+  const startGameButton = document.getElementById("startGameButton");
+  const restartGameButton = document.getElementById("restartGameButton");
+
+  // Game progress elements
+  const gameThemeDisplay = document.getElementById("gameThemeDisplay");
+  const playerRolesList = document.getElementById("playerRolesList");
+  const newGameButton = document.getElementById("newGameButton");
+
+  // Add Player
+  const addPlayerHandler = () => {
+    const name = playerNameInput?.value.trim();
+    if (name) {
+      const newPlayer = {
+        name,
+        avatar: getRandomAvatar(),
+        role: "",
+        hasSeenRole: false,
+      };
+      gameState.players.push(newPlayer);
+      updatePlayerList();
+      playerNameInput.value = "";
+      updateStartButton();
+      savePlayersToStorage(); // Save players after adding
+    }
+  };
+
+  addPlayerBtn?.addEventListener("click", addPlayerHandler);
+
+  playerNameInput?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      addPlayerHandler();
+    }
+  });
+
+  function updatePlayerList() {
+    if (!playerList) return;
+
+    playerList.innerHTML = gameState.players
+      .map(
+        (player, index) => `
+        <div class="player-card bg-purple-900 p-4 rounded-lg border-2 border-purple-100 relative">
+          <button 
+            class="remove-player absolute top-2 right-2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 text-xl font-bold transition-colors"
+            data-player-id="${index}"
+          >
+            ×
+          </button>
+          <img 
+            src="${player.avatar}" 
+            alt="${player.name}" 
+            class="w-24 h-24 mx-auto mb-2 rounded-full"
+          >
+          <h3 class="text-center font-bold">${player.name}</h3>
+        </div>
+      `
+      )
+      .join("");
+
+    // Add click handlers for remove buttons
+    document.querySelectorAll(".remove-player").forEach((button) => {
+      button.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const playerId = parseInt(button.dataset.playerId);
+        const removedPlayer = gameState.players[playerId];
+        usedAvatars.delete(removedPlayer.avatar);
+        gameState.players.splice(playerId, 1);
+        updatePlayerList();
+        updateStartButton();
+        savePlayersToStorage(); // Save players after removing
+      });
+    });
+  }
+
+  function updateStartButton() {
+    if (startGameSetupBtn) {
+      startGameSetupBtn.disabled = gameState.players.length < 2;
+    }
+  }
+
+  startGameSetupBtn?.addEventListener("click", () => {
+    if (gameState.players.length >= 2) {
+      transitionToPhase("theme");
+    }
+  });
+
+  // Generate Word from Theme using ChatGPT
+  const generateWordHandler = async () => {
+    const theme = themeInput?.value.trim();
+    if (!theme) {
+      alert("Please enter a theme");
+      return;
+    }
+
+    gameState.theme = theme;
+    gameState.loading = true;
+    if (loadingIndicator) loadingIndicator.classList.remove("hidden");
+    if (generateWordBtn) generateWordBtn.disabled = true;
+
+    try {
+      const themeWordHistory = getThemeHistory(theme);
+      const response = await fetch("/api/generate-word", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          theme,
+          wordHistory: themeWordHistory,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate word");
+      }
+
+      const data = await response.json();
+      gameState.word = data.word;
+
+      // Add to theme history
+      addToThemeHistory(gameState.theme, gameState.word);
+
+      // Initialize roles
+      initializeRoles();
+
+      // Transition to role reveal phase
+      transitionToPhase("roleReveal");
+    } catch (error) {
+      console.error("Error generating word:", error);
+      alert("Failed to generate word. Please try again.");
+    } finally {
+      gameState.loading = false;
+      if (loadingIndicator) loadingIndicator.classList.add("hidden");
+      if (generateWordBtn) generateWordBtn.disabled = false;
+    }
+  };
+
+  generateWordBtn?.addEventListener("click", generateWordHandler);
+
+  themeInput?.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      generateWordHandler();
+    }
+  });
+
+  function initializeRoles() {
+    // One player gets "Impostor" role, others get the word
+    const impostorIndex = Math.floor(Math.random() * gameState.players.length);
+
+    gameState.players = gameState.players.map((player, index) => ({
+      ...player,
+      role: index === impostorIndex ? "IMPOSTOR" : gameState.word,
+      hasSeenRole: false,
+    }));
+
+    gameState.currentRevealIndex = 0;
+  }
+
+  function transitionToPhase(phase) {
+    gameState.gamePhase = phase;
+
+    // Hide all phases
+    if (setupPhase) setupPhase.classList.add("hidden");
+    if (themePhase) themePhase.classList.add("hidden");
+    if (roleRevealPhase) roleRevealPhase.classList.add("hidden");
+    if (handoffPhase) handoffPhase.classList.add("hidden");
+    if (readyPhase) readyPhase.classList.add("hidden");
+    if (gameInProgressPhase) gameInProgressPhase.classList.add("hidden");
+    if (setupControls) setupControls.classList.add("hidden");
+
+    // Show current phase
+    switch (phase) {
+      case "setup":
+        if (setupPhase) setupPhase.classList.remove("hidden");
+        if (setupControls) setupControls.classList.remove("hidden");
+        break;
+      case "theme":
+        if (themePhase) themePhase.classList.remove("hidden");
+        updatePreviousThemes();
+        break;
+      case "roleReveal":
+        if (roleRevealPhase) roleRevealPhase.classList.remove("hidden");
+        showCurrentRole();
+        break;
+      case "handoff":
+        if (handoffPhase) handoffPhase.classList.remove("hidden");
+        updateHandoffScreen();
+        break;
+      case "ready":
+        if (readyPhase) readyPhase.classList.remove("hidden");
+        updateReadyPhase();
+        break;
+      case "gameInProgress":
+        if (gameInProgressPhase) gameInProgressPhase.classList.remove("hidden");
+        updateGameInProgress();
+        break;
+    }
+  }
+
+  function updatePreviousThemes() {
+    if (!previousThemesList) return;
+
+    const recentThemes = getRecentThemes();
+
+    if (recentThemes.length === 0) {
+      if (previousThemesSection) previousThemesSection.classList.add("hidden");
+      return;
+    }
+
+    if (previousThemesSection) previousThemesSection.classList.remove("hidden");
+
+    previousThemesList.innerHTML = recentThemes
+      .map(
+        (theme) => `
+        <button
+          class="previous-theme-btn bg-purple-800 hover:bg-purple-700 px-4 py-2 rounded-lg border-2 border-purple-300 text-sm font-bold transition-colors"
+          data-theme="${theme}"
+        >
+          ${theme}
+        </button>
+      `
+      )
+      .join("");
+
+    // Add click handlers for previous theme buttons
+    document.querySelectorAll(".previous-theme-btn").forEach((button) => {
+      button.addEventListener("click", () => {
+        const theme = button.dataset.theme;
+        if (themeInput) themeInput.value = theme;
+        generateWordHandler();
+      });
+    });
+  }
+
+  function showCurrentRole() {
+    if (gameState.currentRevealIndex >= gameState.players.length) {
+      transitionToPhase("handoff");
+      return;
+    }
+
+    const currentPlayer = gameState.players[gameState.currentRevealIndex];
+    currentPlayer.hasSeenRole = true;
+
+    if (currentPlayerName) {
+      currentPlayerName.textContent = currentPlayer.name;
+    }
+    if (roleDisplay) {
+      roleDisplay.textContent = currentPlayer.role;
+    }
+    if (playerAvatarDisplay) {
+      playerAvatarDisplay.src = currentPlayer.avatar;
+    }
+    if (progressText) {
+      progressText.textContent = `Player ${gameState.currentRevealIndex + 1} of ${gameState.players.length}`;
+    }
+  }
+
+  confirmRoleButton?.addEventListener("click", () => {
+    gameState.currentRevealIndex++;
+
+    // Check if this was the last player
+    if (gameState.currentRevealIndex >= gameState.players.length) {
+      // Show handoff screen, then transition to ready on next button click
+      transitionToPhase("handoff");
+    } else {
+      // Show handoff screen for next player
+      transitionToPhase("handoff");
+    }
+  });
+
+  nextPlayerButton?.addEventListener("click", () => {
+    // Check if all players have seen their roles
+    if (gameState.currentRevealIndex >= gameState.players.length) {
+      transitionToPhase("ready");
+    } else {
+      transitionToPhase("roleReveal");
+      showCurrentRole();
+    }
+  });
+
+  function updateReadyPhase() {
+    if (finalThemeDisplay) {
+      finalThemeDisplay.textContent = gameState.theme;
+    }
+  }
+
+  startGameButton?.addEventListener("click", () => {
+    transitionToPhase("gameInProgress");
+  });
+
+  restartGameButton?.addEventListener("click", () => {
+    // Reset game state
+    gameState = {
+      players: gameState.players.map((p) => ({
+        ...p,
+        role: "",
+        hasSeenRole: false,
+      })),
+      theme: "",
+      word: "",
+      gamePhase: "setup",
+      currentRevealIndex: 0,
+      loading: false,
+    };
+    themeInput.value = "";
+    transitionToPhase("setup");
+    clearPlayersFromStorage(); // Clear localStorage on restart
+  });
+
+  function updateGameInProgress() {
+    if (gameThemeDisplay) {
+      gameThemeDisplay.textContent = gameState.theme;
+    }
+
+    if (playerRolesList) {
+      playerRolesList.innerHTML = gameState.players
+        .map(
+          (player) => `
+          <div class="flex items-center space-x-4 p-3 bg-purple-800 rounded">
+            <img 
+              src="${player.avatar}" 
+              alt="${player.name}" 
+              class="w-12 h-12 rounded-full"
+            >
+            <div>
+              <p class="font-bold">${player.name}</p>
+              <p class="text-sm text-purple-300">${player.role === "IMPOSTOR" ? "🎭 " : "✓ "}${player.role}</p>
+            </div>
+          </div>
+        `
+        )
+        .join("");
+    }
+  }
+
+  newGameButton?.addEventListener("click", () => {
+    // Reset everything
+    gameState = {
+      players: [],
+      theme: "",
+      word: "",
+      gamePhase: "setup",
+      currentRevealIndex: 0,
+      loading: false,
+    };
+    usedAvatars.clear();
+    playerList.innerHTML = "";
+    transitionToPhase("setup");
+    clearPlayersFromStorage(); // Clear localStorage on new game
+  });
+
+  function updateHandoffScreen() {
+    if (nextPlayerNameDisplay) {
+      const nextPlayer = gameState.players[gameState.currentRevealIndex];
+      nextPlayerNameDisplay.textContent = nextPlayer.name;
+    }
+  }
+
+  // Initialize
+  loadPlayersFromStorage(); // Load players from localStorage on page load
+  transitionToPhase("setup");
+  updateStartButton();
+</script>
+
+<style>
+  .player-card {
+    transition: all 0.3s ease;
+  }
+
+  .player-card:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  [id*="Phase"]:not(.hidden) {
+    display: flex;
+  }
+</style>

@@ -1,0 +1,1151 @@
+---
+// Prize data structure
+const basePrizes = [
+  {
+    id: 1,
+    text: "1 Steam Game + 5 hours gaming with Lumi",
+    emoji: "🎮",
+  },
+  {
+    id: 2,
+    text: "1-2 weeks of free climbing at 'El Muro'",
+    emoji: "🧗",
+  },
+  {
+    id: 3,
+    text: "1-2 weeks of free climbing at 'El Muro'",
+    emoji: "🧗",
+  },
+  {
+    id: 4,
+    text: "1-2 weeks of free climbing at 'El Muro'",
+    emoji: "🧗",
+  },
+  { id: 5, text: "2 Steam Games of your choosing", emoji: "🎮🎮" },
+  { id: 6, text: "Paragliding session with Lumi", emoji: "🪂" },
+  { id: 7, text: "1 Lego Set of your choosing", emoji: "🧱" },
+  { id: 8, text: "1 Pair of Shoes of your choosing", emoji: "👟" },
+  { id: 9, text: "Go-kart session", emoji: "🏎️" },
+  { id: 10, text: "Escape room experience", emoji: "🔐" },
+  {
+    id: 11,
+    text: "Dinner at restaurant of your choosing",
+    emoji: "🍽️",
+  },
+  { id: 12, text: "4 Books of your choosing", emoji: "📚" },
+  { id: 13, text: "1 Backpack of your choosing", emoji: "🎒" },
+  { id: 14, text: "1 Jacket of your choosing", emoji: "🧥" },
+  {
+    id: 15,
+    text: "1-2 weeks of free climbing at 'El Muro'",
+    emoji: "🧗",
+  },
+  {
+    id: 16,
+    text: "1-2 weeks of free climbing at 'El Muro'",
+    emoji: "🧗",
+  },
+];
+
+// Shuffle function (Fisher-Yates algorithm)
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// Randomize the prize order
+const prizes = shuffleArray(basePrizes);
+---
+
+<div class="roulette-container">
+  <h1 class="title">
+    <span class="text-gradient">Gonzalo's Christmas Gift Roulette</span>
+  </h1>
+
+  <div class="controls-top">
+    <div class="ban-info">
+      🚫 Bans: <span id="bans-remaining">10</span> | 🔄 Retries: <span
+        id="retries-remaining">2</span
+      >
+    </div>
+    <div class="coin-flip-toggle">
+      <label class="toggle-label">
+        <input type="checkbox" id="coin-flip-mode" checked />
+        <span class="toggle-text">🪙 Coin Flip Mode (10 bans, 50% chance)</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="prizes-grid">
+    {
+      prizes.map((prize) => (
+        <div class="prize-slot" data-prize-id={prize.id}>
+          <button class="ban-button" data-ban-id={prize.id}>
+            🚫
+          </button>
+          <div class="prize-emoji">{prize.emoji}</div>
+          <div class="prize-text">{prize.text}</div>
+          <div class="prize-conditions">(conditions may apply)</div>
+        </div>
+      ))
+    }
+  </div>
+
+  <div class="controls">
+    <button id="spin-button" class="spin-button"> SPIN THE WHEEL! </button>
+  </div>
+
+  <div id="result-modal" class="result-modal hidden">
+    <div class="result-content">
+      <h2 class="result-title">🎄 YOU WON! 🎄</h2>
+      <div id="winning-prize" class="winning-prize"></div>
+      <div class="modal-buttons">
+        <button id="retry-button" class="retry-button"> USE RETRY </button>
+        <button id="accept-button" class="accept-button"> ACCEPT PRIZE </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script define:vars={{ prizes }} is:inline>
+  // Animation configuration
+  const ANIMATION_CONFIG = {
+    initialSpeed: 30, // Very fast initial speed (ms)
+    finalSpeed: 500, // Very slow final speed (ms)
+    totalDuration: 7000, // Total animation duration (ms)
+
+    // Speed decay function - returns speed (ms) based on elapsed time
+    getSpeed: function (elapsedTime) {
+      const progress = Math.min(elapsedTime / this.totalDuration, 1);
+
+      // Use exponential easing for smooth deceleration
+      // This creates a curve where speed increases exponentially
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+
+      return (
+        this.initialSpeed +
+        (this.finalSpeed - this.initialSpeed) * easedProgress
+      );
+    },
+
+    // Determine if animation should stop
+    shouldStop: function (elapsedTime) {
+      return elapsedTime >= this.totalDuration;
+    },
+  };
+
+  let isSpinning = false;
+  let currentHighlight = -1;
+  let bannedPrizeIds = new Set();
+  let bansRemaining = 10;
+  let retriesRemaining = 2;
+  let lastWinnerIndex = -1;
+  let coinFlipMode = true;
+
+  const spinButton = document.getElementById("spin-button");
+  const resultModal = document.getElementById("result-modal");
+  const winningPrizeDiv = document.getElementById("winning-prize");
+  const retryButton = document.getElementById("retry-button");
+  const acceptButton = document.getElementById("accept-button");
+  const prizeSlots = document.querySelectorAll(".prize-slot");
+  const banButtons = document.querySelectorAll(".ban-button");
+  const bansRemainingSpan = document.getElementById("bans-remaining");
+  const retriesRemainingSpan = document.getElementById("retries-remaining");
+  const coinFlipToggle = document.getElementById("coin-flip-mode");
+
+  function updateCounters() {
+    bansRemainingSpan.textContent = bansRemaining;
+    retriesRemainingSpan.textContent = retriesRemaining;
+    retryButton.disabled = retriesRemaining === 0;
+  }
+
+  function flipCoin() {
+    return Math.random() < 0.5; // true = heads (👾), false = tails (👻)
+  }
+
+  function getUserChoice() {
+    return new Promise((resolve) => {
+      // Create overlay
+      const overlay = document.createElement("div");
+      overlay.className = "coin-flip-overlay";
+
+      // Create modal container
+      const modal = document.createElement("div");
+      modal.className = "coin-flip-modal choice-modal";
+
+      // Create title
+      const title = document.createElement("div");
+      title.className = "choice-title";
+      title.textContent = "CHOOSE YOUR SIDE";
+
+      // Create buttons container
+      const buttonsDiv = document.createElement("div");
+      buttonsDiv.className = "choice-buttons";
+
+      // Heads button
+      const headsBtn = document.createElement("button");
+      headsBtn.className = "choice-button";
+      headsBtn.innerHTML =
+        '<div class="choice-emoji">👾</div><div class="choice-label">HEADS</div>';
+      headsBtn.onclick = () => {
+        overlay.remove();
+        resolve(true); // true = heads
+      };
+
+      // Tails button
+      const tailsBtn = document.createElement("button");
+      tailsBtn.className = "choice-button";
+      tailsBtn.innerHTML =
+        '<div class="choice-emoji">👻</div><div class="choice-label">TAILS</div>';
+      tailsBtn.onclick = () => {
+        overlay.remove();
+        resolve(false); // false = tails
+      };
+
+      buttonsDiv.appendChild(headsBtn);
+      buttonsDiv.appendChild(tailsBtn);
+      modal.appendChild(title);
+      modal.appendChild(buttonsDiv);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+    });
+  }
+
+  function showCoinFlipResult(userChoice, coinResult) {
+    return new Promise((resolve) => {
+      // Create overlay
+      const overlay = document.createElement("div");
+      overlay.className = "coin-flip-overlay";
+
+      // Create modal container
+      const modal = document.createElement("div");
+      modal.className = "coin-flip-modal";
+
+      // Create emoji display
+      const emojiDisplay = document.createElement("div");
+      emojiDisplay.className = "coin-flip-emoji";
+
+      modal.appendChild(emojiDisplay);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      // Animation: swap between emojis
+      const emojis = ["👾", "👻"]; // heads, tails
+      let flipCount = 0;
+      const totalFlips = 12;
+      let currentIndex = 0;
+
+      const flipInterval = setInterval(() => {
+        currentIndex = (currentIndex + 1) % 2;
+        emojiDisplay.textContent = emojis[currentIndex];
+        emojiDisplay.style.transform = "scale(1.2) rotate(180deg)";
+
+        setTimeout(() => {
+          emojiDisplay.style.transform = "scale(1) rotate(0deg)";
+        }, 50);
+
+        flipCount++;
+
+        if (flipCount >= totalFlips) {
+          clearInterval(flipInterval);
+
+          // Show final result
+          setTimeout(() => {
+            const success = userChoice === coinResult;
+            const resultEmoji = coinResult ? "👾" : "👻";
+            const resultText = success ? "BAN APPROVED!" : "BAN DENIED!";
+            const resultColor = success
+              ? "rgba(0, 200, 100, 0.95)"
+              : "rgba(200, 0, 0, 0.95)";
+
+            emojiDisplay.textContent = resultEmoji;
+            emojiDisplay.style.fontSize = "5rem";
+            modal.style.background = resultColor;
+
+            const textDiv = document.createElement("div");
+            textDiv.className = "coin-flip-text";
+            textDiv.textContent = resultText;
+            modal.appendChild(textDiv);
+
+            // Add close button
+            const closeBtn = document.createElement("button");
+            closeBtn.className = "coin-flip-close";
+            closeBtn.textContent = "CLOSE";
+            closeBtn.onclick = () => {
+              overlay.remove();
+              resolve(success);
+            };
+            modal.appendChild(closeBtn);
+
+            // Also allow clicking overlay to close
+            overlay.onclick = (e) => {
+              if (e.target === overlay) {
+                overlay.remove();
+                resolve(success);
+              }
+            };
+          }, 200);
+        }
+      }, 100);
+    });
+  }
+
+  async function toggleBan(prizeId) {
+    if (bannedPrizeIds.has(prizeId)) {
+      // Unbanning
+      bannedPrizeIds.delete(prizeId);
+      bansRemaining++;
+      const slot = document.querySelector(`[data-prize-id="${prizeId}"]`);
+      slot.classList.remove("banned");
+      updateCounters();
+    } else {
+      // Banning
+      if (bansRemaining > 0) {
+        if (coinFlipMode) {
+          // Coin flip mode: user chooses, then flip coin
+          const userChoice = await getUserChoice();
+          const coinResult = flipCoin();
+          bansRemaining--;
+          updateCounters();
+
+          const approved = await showCoinFlipResult(userChoice, coinResult);
+
+          if (approved) {
+            bannedPrizeIds.add(prizeId);
+            const slot = document.querySelector(`[data-prize-id="${prizeId}"]`);
+            slot.classList.add("banned");
+          }
+        } else {
+          // Normal mode: always approve
+          bannedPrizeIds.add(prizeId);
+          bansRemaining--;
+          const slot = document.querySelector(`[data-prize-id="${prizeId}"]`);
+          slot.classList.add("banned");
+          updateCounters();
+        }
+      }
+    }
+  }
+
+  function toggleCoinFlipMode() {
+    coinFlipMode = coinFlipToggle.checked;
+
+    // Reset bans when toggling modes
+    bannedPrizeIds.clear();
+    prizeSlots.forEach((slot) => slot.classList.remove("banned"));
+
+    // Update ban count based on mode
+    bansRemaining = coinFlipMode ? 10 : 5;
+    updateCounters();
+  }
+
+  function clearHighlights() {
+    prizeSlots.forEach((slot) => {
+      slot.classList.remove("highlighted", "winner");
+    });
+  }
+
+  function highlightSlot(index) {
+    clearHighlights();
+    if (index >= 0 && index < prizeSlots.length) {
+      prizeSlots[index].classList.add("highlighted");
+      currentHighlight = index;
+    }
+  }
+
+  function showWinner(winnerIndex) {
+    clearHighlights();
+    prizeSlots[winnerIndex].classList.add("winner");
+    lastWinnerIndex = winnerIndex;
+
+    const winningPrize = prizes[winnerIndex];
+    winningPrizeDiv.innerHTML = `
+      <div class="winner-emoji">${winningPrize.emoji}</div>
+      <div class="winner-text">${winningPrize.text}</div>
+    `;
+
+    resultModal.classList.remove("hidden");
+    updateCounters();
+  }
+
+  function getAvailablePrizeIndices() {
+    return prizes
+      .map((prize, index) => ({ prize, index }))
+      .filter(({ prize }) => !bannedPrizeIds.has(prize.id))
+      .map(({ index }) => index);
+  }
+
+  function spinRoulette() {
+    if (isSpinning) return;
+
+    const availableIndices = getAvailablePrizeIndices();
+    if (availableIndices.length === 0) {
+      alert("All prizes are banned! Unban at least one prize to spin.");
+      return;
+    }
+
+    isSpinning = true;
+    spinButton.disabled = true;
+    clearHighlights();
+
+    // Select random winner from available prizes
+    const winnerIndex =
+      availableIndices[Math.floor(Math.random() * availableIndices.length)];
+
+    const startTime = Date.now();
+    let lastHighlightIndex = -1;
+
+    function animate() {
+      const elapsedTime = Date.now() - startTime;
+
+      // Check if we should stop
+      if (ANIMATION_CONFIG.shouldStop(elapsedTime)) {
+        showWinner(winnerIndex);
+        isSpinning = false;
+        spinButton.disabled = false;
+        return;
+      }
+
+      // Get current speed based on elapsed time
+      const currentSpeed = ANIMATION_CONFIG.getSpeed(elapsedTime);
+
+      // Highlight random slot from available prizes
+      let nextIndex;
+      do {
+        nextIndex =
+          availableIndices[Math.floor(Math.random() * availableIndices.length)];
+      } while (nextIndex === lastHighlightIndex && availableIndices.length > 1);
+
+      highlightSlot(nextIndex);
+      lastHighlightIndex = nextIndex;
+
+      // Schedule next animation frame with current speed
+      setTimeout(animate, currentSpeed);
+    }
+
+    // Start animation
+    animate();
+  }
+
+  function handleRetry() {
+    if (retriesRemaining <= 0 || lastWinnerIndex === -1) return;
+
+    // Ban the last won prize
+    const lastWonPrize = prizes[lastWinnerIndex];
+    if (!bannedPrizeIds.has(lastWonPrize.id)) {
+      bannedPrizeIds.add(lastWonPrize.id);
+      const slot = document.querySelector(
+        `[data-prize-id="${lastWonPrize.id}"]`
+      );
+      slot.classList.add("banned");
+    }
+
+    retriesRemaining--;
+    resultModal.classList.add("hidden");
+    clearHighlights();
+    updateCounters();
+
+    // Automatically spin again
+    setTimeout(() => spinRoulette(), 500);
+  }
+
+  function handleAccept() {
+    resultModal.classList.add("hidden");
+    clearHighlights();
+  }
+
+  // Event listeners
+  spinButton.addEventListener("click", spinRoulette);
+  retryButton.addEventListener("click", handleRetry);
+  acceptButton.addEventListener("click", handleAccept);
+  coinFlipToggle.addEventListener("change", toggleCoinFlipMode);
+
+  // Ban button listeners
+  banButtons.forEach((button) => {
+    button.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const prizeId = parseInt(button.getAttribute("data-ban-id"));
+      toggleBan(prizeId);
+    });
+  });
+</script>
+
+<style lang="scss">
+  .roulette-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3rem;
+    padding: 2rem;
+    min-height: 100vh;
+  }
+
+  .title {
+    font-size: 1.5rem;
+    text-align: center;
+    line-height: 1.8;
+    margin: 0;
+
+    @media (max-width: 768px) {
+      font-size: 1rem;
+    }
+  }
+
+  .text-gradient {
+    background-image: var(--accent-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 400%;
+    background-position: 0%;
+  }
+
+  .controls-top {
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .ban-info {
+    font-size: 0.8rem;
+    color: rgb(224, 204, 250);
+    background: rgba(49, 10, 101, 0.6);
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    border: 2px solid rgba(154, 71, 161, 0.5);
+
+    span {
+      font-weight: bold;
+      color: white;
+    }
+
+    @media (max-width: 768px) {
+      font-size: 0.6rem;
+      padding: 0.5rem 1rem;
+    }
+  }
+
+  .coin-flip-toggle {
+    font-size: 0.75rem;
+
+    @media (max-width: 768px) {
+      font-size: 0.55rem;
+    }
+  }
+
+  .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    color: rgb(224, 204, 250);
+    background: rgba(49, 10, 101, 0.4);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: 2px solid rgba(154, 71, 161, 0.3);
+    transition: all 0.3s ease;
+
+    &:hover {
+      border-color: rgba(154, 71, 161, 0.6);
+      background: rgba(49, 10, 101, 0.6);
+    }
+
+    input[type="checkbox"] {
+      width: 1.2rem;
+      height: 1.2rem;
+      cursor: pointer;
+      accent-color: #9a47a1;
+
+      @media (max-width: 768px) {
+        width: 1rem;
+        height: 1rem;
+      }
+    }
+
+    .toggle-text {
+      user-select: none;
+    }
+  }
+
+  :global(.coin-flip-overlay) {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: rgba(0, 0, 0, 0.9) !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    z-index: 9999 !important;
+    backdrop-filter: blur(5px);
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  :global(.coin-flip-modal) {
+    background: rgba(49, 10, 101, 0.95) !important;
+    border: 4px solid rgb(154, 71, 161) !important;
+    border-radius: 20px;
+    padding: 3rem;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 1.5rem;
+    min-width: 300px;
+    min-height: 200px;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 50px rgba(154, 71, 161, 0.8);
+    z-index: 10000 !important;
+    position: relative !important;
+
+    @media (max-width: 768px) {
+      min-width: 200px;
+      min-height: 150px;
+      padding: 2rem;
+    }
+  }
+
+  :global(.choice-modal) {
+    min-width: 400px;
+    min-height: 250px;
+
+    @media (max-width: 768px) {
+      min-width: 280px;
+      min-height: 200px;
+    }
+  }
+
+  :global(.choice-title) {
+    font-family: "Press Start 2P", system-ui, sans-serif;
+    font-size: 1rem;
+    color: rgb(224, 204, 250);
+    text-align: center;
+    margin-bottom: 1rem;
+
+    @media (max-width: 768px) {
+      font-size: 0.7rem;
+    }
+  }
+
+  :global(.choice-buttons) {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+
+    @media (max-width: 768px) {
+      gap: 1rem;
+      flex-direction: column;
+    }
+  }
+
+  :global(.choice-button) {
+    font-family: "Press Start 2P", system-ui, sans-serif;
+    background: linear-gradient(
+      135deg,
+      rgba(154, 71, 161, 0.8),
+      rgba(49, 10, 101, 0.8)
+    );
+    border: 3px solid rgb(154, 71, 161);
+    border-radius: 12px;
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 120px;
+    color: white;
+
+    &:hover {
+      transform: scale(1.1);
+      border-color: rgb(224, 204, 250);
+      box-shadow: 0 0 30px rgba(224, 204, 250, 0.6);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    @media (max-width: 768px) {
+      padding: 1rem 0.8rem;
+      min-width: 100px;
+    }
+  }
+
+  :global(.choice-emoji) {
+    font-size: 3rem;
+    line-height: 1;
+
+    @media (max-width: 768px) {
+      font-size: 2.5rem;
+    }
+  }
+
+  :global(.choice-label) {
+    font-size: 0.7rem;
+
+    @media (max-width: 768px) {
+      font-size: 0.6rem;
+    }
+  }
+
+  :global(.coin-flip-emoji) {
+    font-size: 4rem;
+    transition: transform 0.1s ease-out;
+    animation: bounceIn 0.3s ease-out;
+
+    @media (max-width: 768px) {
+      font-size: 3rem;
+    }
+  }
+
+  :global(.coin-flip-text) {
+    font-family: "Press Start 2P", system-ui, sans-serif;
+    font-size: 1.2rem;
+    color: white;
+    text-align: center;
+    animation: slideUp 0.3s ease-out;
+
+    @media (max-width: 768px) {
+      font-size: 0.8rem;
+    }
+  }
+
+  :global(.coin-flip-close) {
+    font-family: "Press Start 2P", system-ui, sans-serif;
+    font-size: 0.8rem;
+    padding: 0.8rem 1.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid white;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    margin-top: 1rem;
+    transition: all 0.3s ease;
+    animation: slideUp 0.4s ease-out;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: scale(1.05);
+    }
+
+    &:active {
+      transform: scale(0.95);
+    }
+
+    @media (max-width: 768px) {
+      font-size: 0.6rem;
+      padding: 0.6rem 1.2rem;
+    }
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes bounceIn {
+    0% {
+      transform: scale(0);
+    }
+    50% {
+      transform: scale(1.2);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .prizes-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 1200px;
+
+    @media (max-width: 1024px) {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    @media (max-width: 768px) {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+  }
+
+  .prize-slot {
+    position: relative;
+    background: linear-gradient(rgba(49, 10, 101, 0.4), rgba(49, 10, 101, 0.2));
+    border: 2px solid rgba(154, 71, 161, 0.5);
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    transition: all 0.3s ease;
+    cursor: default;
+    min-height: 150px;
+    justify-content: center;
+
+    &.highlighted {
+      background: linear-gradient(
+        rgba(154, 71, 161, 0.6),
+        rgba(154, 71, 161, 0.4)
+      );
+      border-color: #9a47a1;
+      box-shadow:
+        0 0 20px rgba(154, 71, 161, 0.6),
+        inset 0 0 20px rgba(154, 71, 161, 0.3);
+      transform: scale(1.05);
+    }
+
+    &.winner {
+      background: linear-gradient(
+        rgba(224, 204, 250, 0.3),
+        rgba(154, 71, 161, 0.5)
+      );
+      border-color: rgb(224, 204, 250);
+      box-shadow:
+        0 0 30px rgba(224, 204, 250, 0.8),
+        inset 0 0 30px rgba(224, 204, 250, 0.3);
+      animation: winner-pulse 1s ease-in-out infinite;
+    }
+
+    &.banned {
+      background: linear-gradient(rgba(100, 0, 0, 0.6), rgba(50, 0, 0, 0.4));
+      border-color: rgba(255, 0, 0, 0.7);
+      opacity: 0.5;
+
+      .prize-emoji,
+      .prize-text,
+      .prize-conditions {
+        opacity: 0.4;
+      }
+    }
+  }
+
+  .ban-button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.7rem;
+    transition: all 0.2s ease;
+    z-index: 10;
+
+    &:hover {
+      background: rgba(255, 0, 0, 0.8);
+      transform: scale(1.1);
+    }
+
+    .banned & {
+      background: rgba(255, 0, 0, 0.8);
+      border-color: rgba(255, 0, 0, 1);
+    }
+
+    @media (max-width: 768px) {
+      width: 1.2rem;
+      height: 1.2rem;
+      font-size: 0.6rem;
+    }
+  }
+
+  @keyframes winner-pulse {
+    0%,
+    100% {
+      transform: scale(1.05);
+      box-shadow:
+        0 0 30px rgba(224, 204, 250, 0.8),
+        inset 0 0 30px rgba(224, 204, 250, 0.3);
+    }
+    50% {
+      transform: scale(1.1);
+      box-shadow:
+        0 0 50px rgba(224, 204, 250, 1),
+        inset 0 0 50px rgba(224, 204, 250, 0.5);
+    }
+  }
+
+  .prize-emoji {
+    font-size: 2.5rem;
+    line-height: 1;
+
+    @media (max-width: 768px) {
+      font-size: 2rem;
+    }
+  }
+
+  .prize-text {
+    font-size: 0.7rem;
+    text-align: center;
+    color: white;
+    line-height: 1.4;
+
+    @media (max-width: 768px) {
+      font-size: 0.6rem;
+    }
+  }
+
+  .prize-conditions {
+    font-size: 0.5rem;
+    color: rgba(255, 255, 255, 0.6);
+    font-style: italic;
+
+    @media (max-width: 768px) {
+      font-size: 0.45rem;
+    }
+  }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .spin-button {
+    font-family: "Press Start 2P", system-ui, sans-serif;
+    font-size: 1rem;
+    padding: 1.5rem 3rem;
+    background: linear-gradient(
+      45deg,
+      rgba(154, 71, 161, 0.8),
+      rgba(224, 204, 250, 0.6)
+    );
+    border: 3px solid #9a47a1;
+    border-radius: 12px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(154, 71, 161, 0.4);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-2px) scale(1.05);
+      box-shadow: 0 6px 25px rgba(224, 204, 250, 0.6);
+      background: linear-gradient(
+        45deg,
+        rgba(224, 204, 250, 0.8),
+        rgba(154, 71, 161, 0.8)
+      );
+    }
+
+    &:active:not(:disabled) {
+      transform: translateY(0) scale(0.98);
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 768px) {
+      font-size: 0.7rem;
+      padding: 1rem 2rem;
+    }
+  }
+
+  .result-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+
+    &.hidden {
+      display: none;
+    }
+  }
+
+  .result-content {
+    background: linear-gradient(
+      135deg,
+      rgba(49, 10, 101, 0.95),
+      rgba(154, 71, 161, 0.95)
+    );
+    border: 4px solid rgb(224, 204, 250);
+    border-radius: 20px;
+    padding: 3rem;
+    max-width: 600px;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    box-shadow: 0 0 50px rgba(224, 204, 250, 0.8);
+    animation: modal-appear 0.5s ease-out;
+  }
+
+  @keyframes modal-appear {
+    from {
+      opacity: 0;
+      transform: scale(0.8) translateY(-50px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  .result-title {
+    font-size: 1.5rem;
+    color: rgb(224, 204, 250);
+    margin: 0;
+    text-align: center;
+    animation: title-bounce 0.6s ease-out;
+
+    @media (max-width: 768px) {
+      font-size: 1rem;
+    }
+  }
+
+  @keyframes title-bounce {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  .winning-prize {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    color: white;
+  }
+
+  .winner-emoji {
+    font-size: 4rem;
+    animation: emoji-spin 1s ease-out;
+
+    @media (max-width: 768px) {
+      font-size: 3rem;
+    }
+  }
+
+  @keyframes emoji-spin {
+    from {
+      transform: rotate(-360deg) scale(0);
+    }
+    to {
+      transform: rotate(0) scale(1);
+    }
+  }
+
+  .winner-text {
+    font-size: 1rem;
+    text-align: center;
+    line-height: 1.6;
+
+    @media (max-width: 768px) {
+      font-size: 0.7rem;
+    }
+  }
+
+  .modal-buttons {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .retry-button,
+  .accept-button {
+    font-family: "Press Start 2P", system-ui, sans-serif;
+    font-size: 0.8rem;
+    padding: 1rem 1.5rem;
+    border: 3px solid;
+    border-radius: 12px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+    &:active {
+      transform: scale(0.98);
+    }
+
+    @media (max-width: 768px) {
+      font-size: 0.6rem;
+      padding: 0.8rem 1.2rem;
+    }
+  }
+
+  .retry-button {
+    background: linear-gradient(
+      45deg,
+      rgba(255, 150, 0, 0.9),
+      rgba(255, 100, 0, 0.9)
+    );
+    border-color: rgb(255, 150, 0);
+
+    &:hover:not(:disabled) {
+      transform: scale(1.05);
+      box-shadow: 0 0 30px rgba(255, 150, 0, 0.8);
+    }
+
+    &:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      background: linear-gradient(
+        45deg,
+        rgba(100, 100, 100, 0.5),
+        rgba(80, 80, 80, 0.5)
+      );
+      border-color: rgb(100, 100, 100);
+    }
+  }
+
+  .accept-button {
+    background: linear-gradient(
+      45deg,
+      rgba(0, 200, 100, 0.9),
+      rgba(0, 150, 80, 0.9)
+    );
+    border-color: rgb(0, 200, 100);
+
+    &:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 30px rgba(0, 200, 100, 0.8);
+    }
+  }
+</style>
